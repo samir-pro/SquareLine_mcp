@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "squareline-mcp"
+version = "0.1.0"
+description = "MCP server that generates SquareLine Studio (.spj) LVGL projects, preset for the Elecrow CrowPanel 5\" (ESP32, 800x480, LVGL 8.3.11)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "samir-pro" }]
+keywords = ["mcp", "squareline", "lvgl", "esp32", "crowpanel", "arduino", "ui"]
+dependencies = ["mcp>=1.2"]
+
+[project.scripts]
+squareline-mcp = "squareline_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

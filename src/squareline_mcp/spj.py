@@ -144,20 +144,64 @@ def p_guidref(strtype: str, guid: str) -> Dict[str, Any]:
     return {"nid": new_nid(), "strtype": strtype, "strval": guid, "InheritedType": IT_GUIDREF}
 
 
-def p_style(strtype: str, part: str, summary: str, style_children: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """A style property.  ``part`` is e.g. ``lv.PART.MAIN``.  ``style_children``
-    are the ``_style/*`` records that live under the DEFAULT state."""
+_IT_VALUE_KEY = {
+    IT_BOOL: "strval",
+    IT_ENUM: "strval",
+    IT_IMAGE: "strval",
+    IT_GUIDREF: "strval",
+    IT_STRING: "strval",
+    IT_INT: "integer",
+    IT_INTARRAY: "intarray",
+}
+
+
+def p_value(strtype: str, it: int, value: Any) -> Dict[str, Any]:
+    """Generic property record for a given InheritedType.
+
+    Booleans are coerced to SquareLine's "True"/"False" strings. ``None`` leaves
+    the value key out (SquareLine treats that as unset, e.g. an empty delay).
+    """
+    rec: Dict[str, Any] = {"nid": new_nid(), "strtype": strtype, "InheritedType": it}
+    if it == IT_HEADER:
+        return rec
+    key = _IT_VALUE_KEY.get(it, "strval")
+    if it == IT_BOOL:
+        rec[key] = "True" if (value if isinstance(value, bool) else str(value).lower() in
+                              ("1", "true", "yes", "on")) else "False"
+    elif value is not None:
+        rec[key] = value
+    return rec
+
+
+def _style_state(state: str, style_children: List[Dict[str, Any]]) -> Dict[str, Any]:
+    return {
+        "nid": new_nid(),
+        "strtype": "_style/StyleState",
+        "strval": state,
+        "childs": style_children,
+        "InheritedType": IT_HEADER,
+    }
+
+
+def p_style(strtype: str, part: str, summary: str,
+            states: Any = None) -> Dict[str, Any]:
+    """A style property record for one part of a widget.
+
+    ``part`` is e.g. ``lv.PART.MAIN``. ``states`` may be:
+      * a list  -> those records under the DEFAULT state, or
+      * a dict {state_name: [records]} -> one StyleState child per state.
+    A DEFAULT state is always emitted (SquareLine expects it first)."""
+    if states is None:
+        states = {}
+    if isinstance(states, list):
+        states = {"DEFAULT": states}
+    childs = [_style_state("DEFAULT", states.get("DEFAULT", []))]
+    for name, recs in states.items():
+        if name != "DEFAULT":
+            childs.append(_style_state(name, recs))
     return {
         "part": part,
-        "childs": [
-            {
-                "nid": new_nid(),
-                "strtype": "_style/StyleState",
-                "strval": "DEFAULT",
-                "childs": style_children,
-                "InheritedType": IT_HEADER,
-            }
-        ],
+        "childs": childs,
         "nid": new_nid(),
         "strtype": strtype,
         "strval": summary,
@@ -165,35 +209,43 @@ def p_style(strtype: str, part: str, summary: str, style_children: List[Dict[str
     }
 
 
-# --- style child builders (the "_style/*" records) ---------------------------
-# Exposed to the model so a widget can carry a small set of common style tweaks.
-
-STYLE_BUILDERS = {
-    "bg_color": lambda v: p_intarray("_style/Bg_Color", v),
-    "bg_opa": lambda v: p_int("_style/Bg_Opa", v),
-    "bg_image": lambda v: p_image("_style/Bg_Image", v),
-    "radius": lambda v: p_int("_style/Bg_Radius", v),
-    "border_color": lambda v: p_intarray("_style/Border_Color", v),
-    "border_width": lambda v: p_int("_style/Border width", v),
-    "text_color": lambda v: p_intarray("_style/Text_Color", v),
-    "text_align": lambda v: p_enum("_style/Text_Align", v),
-    "text_font": lambda v: p_enum("_style/Text_Font", v),
-    "pad": lambda v: p_intarray("_style/Padding", v),
-}
-
-
-def build_style_children(styles: Dict[str, Any]) -> List[Dict[str, Any]]:
-    children: List[Dict[str, Any]] = []
-    for key, value in styles.items():
-        builder = STYLE_BUILDERS.get(key)
-        if builder is not None:
-            children.append(builder(value))
-    return children
-
-
 # --- shared OBJECT property block --------------------------------------------
 # Every widget carries the same OBJECT/* base (name, geometry, flags, states).
 # Screens are top-level and omit the geometry/child-only flags.
+
+
+# Layout kinds for OBJECT/Layout_type.  Values follow SquareLine's encoding.
+_LAYOUTS = {
+    "none": {"strval": "No_layout", "LayoutType": 0},
+    "flex": {"strval": "Flex_layout", "LayoutType": 1},
+    "grid": {"strval": "Grid_layout", "LayoutType": 2},
+}
+# Flex "Flow" enum -> int (ROW=0, COLUMN=1, ROW_WRAP=2, COLUMN_WRAP=3, ...)
+_FLEX_FLOW = {"ROW": 0, "COLUMN": 1, "ROW_WRAP": 2, "COLUMN_WRAP": 3,
+              "ROW_REVERSE": 4, "COLUMN_REVERSE": 5}
+# Flex alignment enum -> int (START=0, END=1, CENTER=2, SPACE_EVENLY=3,
+# SPACE_AROUND=4, SPACE_BETWEEN=5)
+_FLEX_ALIGN = {"START": 0, "END": 1, "CENTER": 2, "SPACE_EVENLY": 3,
+               "SPACE_AROUND": 4, "SPACE_BETWEEN": 5}
+
+
+def _layout_record(layout: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    kind = (layout or {}).get("type", "none").lower()
+    base = dict(_LAYOUTS.get(kind, _LAYOUTS["none"]))
+    rec = {
+        "Flow": _FLEX_FLOW.get(str((layout or {}).get("flow", "ROW")).upper(), 0),
+        "Wrap": bool((layout or {}).get("wrap", False)),
+        "Reversed": False,
+        "MainAlignment": _FLEX_ALIGN.get(str((layout or {}).get("main_align", "START")).upper(), 0),
+        "CrossAlignment": _FLEX_ALIGN.get(str((layout or {}).get("cross_align", "START")).upper(), 0),
+        "TrackAlignment": _FLEX_ALIGN.get(str((layout or {}).get("track_align", "START")).upper(), 0),
+        "LayoutType": base["LayoutType"],
+        "nid": new_nid(),
+        "strtype": "OBJECT/Layout_type",
+        "strval": base["strval"],
+        "InheritedType": IT_LAYOUT,
+    }
+    return rec
 
 
 def object_base_props(
@@ -209,23 +261,13 @@ def object_base_props(
     clickable: bool = True,
     checkable: bool = False,
     disabled: bool = False,
+    layout: Optional[Dict[str, Any]] = None,
+    flags: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     props: List[Dict[str, Any]] = [
         p_string("OBJECT/Name", name),
         p_header("OBJECT/Layout"),
-        {
-            "Flow": 0,
-            "Wrap": False,
-            "Reversed": False,
-            "MainAlignment": 0,
-            "CrossAlignment": 0,
-            "TrackAlignment": 0,
-            "LayoutType": 0,
-            "nid": new_nid(),
-            "strtype": "OBJECT/Layout_type",
-            "strval": "No_layout",
-            "InheritedType": IT_LAYOUT,
-        },
+        _layout_record(layout),
         p_header("OBJECT/Transform"),
     ]
 
@@ -280,46 +322,16 @@ def object_base_props(
         p_bool("OBJECT/User_3", False),
         p_bool("OBJECT/User_4", False),
     ]
+
+    # Generic OBJECT/* overrides by suffix (e.g. {"Scrollable": False}).
+    if flags:
+        want = {"OBJECT/%s" % k: v for k, v in flags.items()}
+        for rec in props:
+            st = rec.get("strtype")
+            if st in want and rec.get("InheritedType") in (IT_BOOL, IT_ENUM):
+                v = want[st]
+                rec["strval"] = ("True" if v else "False") if isinstance(v, bool) else str(v)
     return props
 
 
-# --- event builder -----------------------------------------------------------
-
-
-def change_screen_event(trigger: str, target_guid: str, target_name: str,
-                        fade_mode: str = "MOVE_LEFT", speed: int = 500, delay: int = 0) -> Dict[str, Any]:
-    """A ``_event/EventHandler`` record that switches to another screen."""
-    return {
-        "disabled": False,
-        "nid": new_nid(),
-        "strtype": "_event/EventHandler",
-        "strval": trigger,
-        "childs": [
-            p_string("_event/name", "Event1"),
-            p_string("_event/condition_C", ""),
-            p_string("_event/condition_P", ""),
-            {
-                "nid": new_nid(),
-                "strtype": "_event/action",
-                "strval": "CHANGE SCREEN",
-                "childs": [
-                    p_string("CHANGE SCREEN/Name", "CHANGE SCREEN"),
-                    p_string(
-                        "CHANGE SCREEN/Call",
-                        "ChangeScreen( <{Screen_to}>, lv.SCR_LOAD_ANIM.<{Fade_mode}>, <{Speed}>, <{Delay}>)",
-                    ),
-                    p_string(
-                        "CHANGE SCREEN/CallC",
-                        "_ui_screen_change( &<{Screen_to}>, LV_SCR_LOAD_ANIM_<{Fade_mode}>, "
-                        "<{Speed}>, <{Delay}>, &<{Screen_to}>_screen_init);",
-                    ),
-                    p_guidref("CHANGE SCREEN/Screen_to", target_guid),
-                    p_enum("CHANGE SCREEN/Fade_mode", fade_mode),
-                    p_int("CHANGE SCREEN/Speed", speed),
-                    p_int("CHANGE SCREEN/Delay", delay),
-                ],
-                "InheritedType": IT_STRING,
-            },
-        ],
-        "InheritedType": IT_EVENT,
-    }
+# Event/action records are built in events.py from the bundled action templates.

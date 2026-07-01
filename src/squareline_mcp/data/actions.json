@@ -1,0 +1,890 @@
+{
+ "BAR_PROPERTY": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "BAR_PROPERTY"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetBarProperty(<{Target}>, '<{Property}>', <{Value}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_bar_set_property(<{Target}>, _UI_BAR_PROPERTY_<{Property}>, <{Value}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID78912784-359054S2354183"
+   },
+   {
+    "suffix": "Property",
+    "it": 3,
+    "key": "strval",
+    "default": "Value_with_anim"
+   },
+   {
+    "suffix": "Value",
+    "it": 10,
+    "key": "strval",
+    "default": "10"
+   }
+  ],
+  "params": [
+   "Target",
+   "Property",
+   "Value"
+  ]
+ },
+ "LABEL_PROPERTY": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "LABEL_PROPERTY"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetLabelProperty(<{Target}>, '<{Property}>', '<{Value}>')"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_label_set_property(<{Target}>, _UI_LABEL_PROPERTY_<{Property}>, \"<{Value}>\");"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID64678087-395737S1524147"
+   },
+   {
+    "suffix": "Property",
+    "it": 3,
+    "key": "strval",
+    "default": "Text"
+   },
+   {
+    "suffix": "Value",
+    "it": 10,
+    "key": "strval",
+    "default": "my text"
+   }
+  ],
+  "params": [
+   "Target",
+   "Property",
+   "Value"
+  ]
+ },
+ "SLIDER_PROPERTY": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "SLIDER_PROPERTY"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetSliderProperty(<{Target}>, '<{Property}>', <{Value}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_slider_set_property(<{Target}>, _UI_SLIDER_PROPERTY_<{Property}>, <{Value}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID43292868-953628S6454179"
+   },
+   {
+    "suffix": "Property",
+    "it": 3,
+    "key": "strval",
+    "default": "Value_with_anim"
+   },
+   {
+    "suffix": "Value",
+    "it": 10,
+    "key": "strval",
+    "default": "20"
+   }
+  ],
+  "params": [
+   "Target",
+   "Property",
+   "Value"
+  ]
+ },
+ "BASIC_PROPERTY": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "BASIC_PROPERTY"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetPanelProperty(<{Target}>, '<{Property}>', <{Value}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_basic_set_property(<{Target}>, _UI_BASIC_PROPERTY_<{Property}>,  <{Value}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID51327197-656165S9764140"
+   },
+   {
+    "suffix": "Property",
+    "it": 3,
+    "key": "strval",
+    "default": "Position_Y"
+   },
+   {
+    "suffix": "Value",
+    "it": 6,
+    "key": "integer",
+    "default": 5
+   }
+  ],
+  "params": [
+   "Target",
+   "Property",
+   "Value"
+  ]
+ },
+ "ROLLER_PROPERTY": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "ROLLER_PROPERTY"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetRollerProperty(<{Target}>, '<{Property}>', <{Value}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_roller_set_property(<{Target}>, _UI_ROLLER_PROPERTY_<{Property}>, <{Value}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID96619428-953630S8764179"
+   },
+   {
+    "suffix": "Property",
+    "it": 3,
+    "key": "strval",
+    "default": "Selected_with_anim"
+   },
+   {
+    "suffix": "Value",
+    "it": 10,
+    "key": "strval",
+    "default": "0"
+   }
+  ],
+  "params": [
+   "Target",
+   "Property",
+   "Value"
+  ]
+ },
+ "CHANGE SCREEN": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "CHANGE SCREEN"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "ChangeScreen( <{Screen_to}>, lv.SCR_LOAD_ANIM.<{Fade_mode}>, <{Speed}>, <{Delay}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_screen_change( &<{Screen_to}>, LV_SCR_LOAD_ANIM_<{Fade_mode}>, <{Speed}>, <{Delay}>, &<{Screen_to}>_screen_init);"
+   },
+   {
+    "suffix": "Screen_to",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID78749189-727914S11134135"
+   },
+   {
+    "suffix": "Fade_mode",
+    "it": 3,
+    "key": "strval",
+    "default": "MOVE_LEFT"
+   },
+   {
+    "suffix": "Speed",
+    "it": 6,
+    "key": "integer",
+    "default": 500
+   },
+   {
+    "suffix": "Delay",
+    "it": 6,
+    "key": "strval",
+    "default": null
+   }
+  ],
+  "params": [
+   "Screen_to",
+   "Fade_mode",
+   "Speed",
+   "Delay"
+  ]
+ },
+ "INCREMENT ARC": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "INCREMENT ARC"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "IncrementArc( <{Target}>, <{Value}> )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_arc_increment( <{Target}>, <{Value}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID18567649-870842S1754179"
+   },
+   {
+    "suffix": "Value",
+    "it": 6,
+    "key": "integer",
+    "default": -50
+   }
+  ],
+  "params": [
+   "Target",
+   "Value"
+  ]
+ },
+ "INCREMENT BAR": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "INCREMENT BAR"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "IncrementBar( <{Target}>, <{Value}>, lv.ANIM.<{Animate}> )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_bar_increment( <{Target}>, <{Value}>, LV_ANIM_<{Animate}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID78912784-359054S2354183"
+   },
+   {
+    "suffix": "Value",
+    "it": 6,
+    "key": "integer",
+    "default": 20
+   },
+   {
+    "suffix": "Animate",
+    "it": 3,
+    "key": "strval",
+    "default": "ON"
+   }
+  ],
+  "params": [
+   "Target",
+   "Value",
+   "Animate"
+  ]
+ },
+ "INCREMENT SLIDER": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "INCREMENT SLIDER"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "IncrementSlider( <{Target}>, <{Value}>, lv.ANIM.<{Animate}> )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_slider_increment( <{Target}>, <{Value}>, LV_ANIM_<{Animate}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID43292868-953628S6454179"
+   },
+   {
+    "suffix": "Value",
+    "it": 6,
+    "key": "integer",
+    "default": 22
+   },
+   {
+    "suffix": "Animate",
+    "it": 3,
+    "key": "strval",
+    "default": "ON"
+   }
+  ],
+  "params": [
+   "Target",
+   "Value",
+   "Animate"
+  ]
+ },
+ "KEYBOARD SET TARGET": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "KEYBOARD SET TARGET"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "KeyboardSetTarget( <{Keyboard}>,  <{TextArea}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_keyboard_set_target(<{Keyboard}>,  <{TextArea}>);"
+   },
+   {
+    "suffix": "Keyboard",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID15057928-953632S2114179"
+   },
+   {
+    "suffix": "TextArea",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID55886626-953634S198084179"
+   }
+  ],
+  "params": [
+   "Keyboard",
+   "TextArea"
+  ]
+ },
+ "MODIFY FLAG": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "MODIFY FLAG"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "ModifyFlag( <{Object}>, lv.obj.FLAG.<{Flag}>, \"<{Action}>\")"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_flag_modify( <{Object}>, LV_OBJ_FLAG_<{Flag}>, _UI_MODIFY_FLAG_<{Action}>);"
+   },
+   {
+    "suffix": "Object",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID51327197-656165S9764140"
+   },
+   {
+    "suffix": "Flag",
+    "it": 3,
+    "key": "strval",
+    "default": "PRESS_LOCK"
+   },
+   {
+    "suffix": "Action",
+    "it": 3,
+    "key": "strval",
+    "default": "ADD"
+   }
+  ],
+  "params": [
+   "Object",
+   "Flag",
+   "Action"
+  ]
+ },
+ "MODIFY STATE": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "MODIFY STATE"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "ModifyState( <{Object}>, lv.STATE.<{State}>, \"<{Action}>\")"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_state_modify( <{Object}>, LV_STATE_<{State}>, _UI_MODIFY_STATE_<{Action}>);"
+   },
+   {
+    "suffix": "Object",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID68111748-395739S4664147"
+   },
+   {
+    "suffix": "State",
+    "it": 3,
+    "key": "strval",
+    "default": "CHECKED"
+   },
+   {
+    "suffix": "Action",
+    "it": 3,
+    "key": "strval",
+    "default": "REMOVE"
+   }
+  ],
+  "params": [
+   "Object",
+   "State",
+   "Action"
+  ]
+ },
+ "MOVE CURSOR": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "MOVE CURSOR"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "TextAreaMoveCursor( <{Target}>, \"<{Direction}>\" )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_textarea_move_cursor( <{Target}>, UI_MOVE_CURSOR_<{Direction}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID55886626-953634S198084179"
+   },
+   {
+    "suffix": "Direction",
+    "it": 3,
+    "key": "strval",
+    "default": "DOWN"
+   }
+  ],
+  "params": [
+   "Target",
+   "Direction"
+  ]
+ },
+ "SET OPACITY": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "SET OPACITY"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "set_opacity( <{Target}>, <{Value}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_opacity_set( <{Target}>, <{Value}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID78749189-727914S11134135"
+   },
+   {
+    "suffix": "Value",
+    "it": 6,
+    "key": "integer",
+    "default": 66
+   }
+  ],
+  "params": [
+   "Target",
+   "Value"
+  ]
+ },
+ "PLAY ANIMATION": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "PLAY ANIMATION"
+   },
+   {
+    "suffix": "FunctionName",
+    "it": 10,
+    "key": "strval",
+    "default": "Animation1_Animation"
+   },
+   {
+    "suffix": "Animation",
+    "it": 8,
+    "key": "strval",
+    "default": "Animation1"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID78749189-727914S11134135"
+   },
+   {
+    "suffix": "Delay",
+    "it": 6,
+    "key": "strval",
+    "default": null
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "<{FunctionName}>(<{Target}>, <{Delay}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "<{FunctionName}>(<{Target}>, <{Delay}>);"
+   }
+  ],
+  "params": [
+   "Animation",
+   "Target",
+   "Delay"
+  ]
+ },
+ "STEP SPINBOX": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "STEP SPINBOX"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "StepSpinbox( <{Target}>, <{Direction}> )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_spinbox_step( <{Target}>, <{Direction}>);"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID24600454-953638S9424179"
+   },
+   {
+    "suffix": "Direction",
+    "it": 3,
+    "key": "strval",
+    "default": "1"
+   }
+  ],
+  "params": [
+   "Target",
+   "Direction"
+  ]
+ },
+ "SWITCH THEME": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "SWITCH THEME"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SwitchTheme( <{Theme}> )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_switch_theme( <{Theme}> );"
+   },
+   {
+    "suffix": "Theme",
+    "it": 16,
+    "key": "strval",
+    "default": "Default"
+   }
+  ],
+  "params": [
+   "Theme"
+  ]
+ },
+ "SET TEXT VALUE FROM ARC": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "SET TEXT VALUE FROM ARC"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetTextValueArc( <{Target}>, target, \"<{Prefix}>\", \"<{Postfix}>\")"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_arc_set_text_value( <{Target}>, target, \"<{Prefix}>\", \"<{Postfix}>\");"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID64678087-395737S1524147"
+   },
+   {
+    "suffix": "Prefix",
+    "it": 10,
+    "key": "strval",
+    "default": "before"
+   },
+   {
+    "suffix": "Postfix",
+    "it": 10,
+    "key": "strval",
+    "default": "after"
+   }
+  ],
+  "params": [
+   "Target",
+   "Prefix",
+   "Postfix"
+  ]
+ },
+ "CALL FUNCTION": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "CALL FUNCTION"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "<{Function_name}>( event_struct )"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "<{Function_name}>( e );"
+   },
+   {
+    "suffix": "Function_name",
+    "it": 10,
+    "key": "strval",
+    "default": "tab_changed"
+   },
+   {
+    "suffix": "Dont_export_function",
+    "it": 2,
+    "key": "strval",
+    "default": "False"
+   }
+  ],
+  "params": [
+   "Function_name",
+   "Dont_export_function"
+  ]
+ },
+ "SET TEXT VALUE FROM SLIDER": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "SET TEXT VALUE FROM SLIDER"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "SetTextValueSlider( <{Target}>, event_struct.get_target(), \"<{Prefix}>\", \"<{Postfix}>\")"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_slider_set_text_value( <{Target}>, target, \"<{Prefix}>\", \"<{Postfix}>\");"
+   },
+   {
+    "suffix": "Target",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID75599735-31672S6060357"
+   },
+   {
+    "suffix": "Prefix",
+    "it": 10,
+    "key": "strval",
+    "default": ""
+   },
+   {
+    "suffix": "Postfix",
+    "it": 10,
+    "key": "strval",
+    "default": "%"
+   }
+  ],
+  "params": [
+   "Target",
+   "Prefix",
+   "Postfix"
+  ]
+ },
+ "DELETE SCREEN": {
+  "template": [
+   {
+    "suffix": "Name",
+    "it": 10,
+    "key": "strval",
+    "default": "DELETE SCREEN"
+   },
+   {
+    "suffix": "Call",
+    "it": 10,
+    "key": "strval",
+    "default": "DeleteScreen(<{Screen}>)"
+   },
+   {
+    "suffix": "CallC",
+    "it": 10,
+    "key": "strval",
+    "default": "_ui_screen_delete( &<{Screen}>);"
+   },
+   {
+    "suffix": "Screen",
+    "it": 9,
+    "key": "strval",
+    "default": "GUID97253350-708201S10163189"
+   }
+  ],
+  "params": [
+   "Screen"
+  ]
+ }
+}

@@ -11,11 +11,11 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from . import spj, widgets
+from . import spj, styles, widgets
 from .board import CROWPANEL_5, Board
 
-
-# --- model -------------------------------------------------------------------
+# part -> state -> {friendly_style_key: value}
+PartStyles = Dict[str, Dict[str, Dict[str, Any]]]
 
 
 @dataclass
@@ -27,12 +27,14 @@ class Widget:
     w: int = 0
     h: int = 0
     align: str = "TOP_LEFT"
-    value: Any = None
     hidden: bool = False
-    clickable: Optional[bool] = None      # None => widget default
+    clickable: Optional[bool] = None
     checkable: Optional[bool] = None
     disabled: bool = False
-    styles: Dict[str, Any] = field(default_factory=dict)
+    config: Dict[str, Any] = field(default_factory=dict)   # suffix -> value
+    styles: PartStyles = field(default_factory=dict)        # part -> state -> kv
+    flags: Dict[str, Any] = field(default_factory=dict)     # OBJECT/* suffix -> value
+    layout: Optional[Dict[str, Any]] = None                 # flex/grid layout config
     events: List[Dict[str, Any]] = field(default_factory=list)
     children: List["Widget"] = field(default_factory=list)
     guid: str = field(default_factory=spj.new_guid)
@@ -41,11 +43,20 @@ class Widget:
     def spec(self) -> widgets.WidgetSpec:
         return widgets.WIDGETS[self.type_key]
 
+    def set_value(self, value: Any) -> None:
+        if self.spec.value_field is None:
+            raise ValueError("Widget type %r has no editable value" % self.spec.key)
+        self.config[self.spec.value_field] = value
+
+    def set_style(self, key: str, value: Any, part: str = "main", state: str = "DEFAULT") -> None:
+        self.styles.setdefault(part, {}).setdefault(state, {})[key] = value
+
 
 @dataclass
 class Screen:
     name: str
     widgets: List[Widget] = field(default_factory=list)
+    styles: PartStyles = field(default_factory=dict)
     events: List[Dict[str, Any]] = field(default_factory=list)
     guid: str = field(default_factory=spj.new_guid)
 
@@ -71,6 +82,13 @@ class Project:
             if found is not None:
                 return found
         raise KeyError("No widget named %r" % name)
+
+    def guid_of(self, name: str) -> str:
+        """Resolve a screen or widget name to its guid (for event targets)."""
+        for s in self.screens:
+            if s.name == name:
+                return s.guid
+        return self.find_widget(name).guid
 
     def all_names(self) -> List[str]:
         names = [s.name for s in self.screens]
@@ -98,15 +116,17 @@ class Project:
             "children": [self._screen_node(s) for s in self.screens],
             "locked": False,
             "properties": [
-                {
-                    "nid": spj.new_nid(),
-                    "strtype": "STARTEVENTS/Name",
-                    "strval": "___initial_actions0",
-                    "InheritedType": spj.IT_STRING,
-                }
+                spj.p_string("STARTEVENTS/Name", "___initial_actions0"),
             ],
             "saved_objtypeKey": "STARTEVENTS",
         }
+
+    def _screen_style(self, s: Screen, suffix: str, part: str) -> Dict[str, Any]:
+        by_state = s.styles.get(part, {})
+        states = {state: styles.build_children(kv) for state, kv in by_state.items()}
+        summary = ("lv.PART.MAIN, Rectangle, Pad, Text" if part == "main"
+                   else "lv.PART.SCROLLBAR, Rectangle, Pad")
+        return spj.p_style("SCREEN/%s" % suffix, styles.PARTS[part], summary, states)
 
     def _screen_node(self, s: Screen) -> Dict[str, Any]:
         props = spj.object_base_props(name=s.name, is_screen=True)
@@ -114,10 +134,8 @@ class Project:
             spj.p_header("SCREEN/Screen"),
             spj.p_bool("SCREEN/Temporary", False),
             spj.p_bool("SCREEN/Don't export screen", False),
-            spj.p_style("SCREEN/Style_main", "lv.PART.MAIN",
-                        "lv.PART.MAIN, Rectangle, Pad, Text", []),
-            spj.p_style("SCREEN/Style_scrollbar", "lv.PART.SCROLLBAR",
-                        "lv.PART.SCROLLBAR, Rectangle, Pad", []),
+            self._screen_style(s, "Style_main", "main"),
+            self._screen_style(s, "Style_scrollbar", "scrollbar"),
         ]
         props += s.events
         return {
@@ -137,20 +155,14 @@ class Project:
         width = w.w or spec.default_w
         height = w.h or spec.default_h
         props = spj.object_base_props(
-            name=w.name,
-            is_screen=False,
-            x=w.x,
-            y=w.y,
-            w=width,
-            h=height,
-            align=w.align,
+            name=w.name, is_screen=False, x=w.x, y=w.y, w=width, h=height, align=w.align,
             hidden=w.hidden,
             clickable=spec.clickable if w.clickable is None else w.clickable,
             checkable=spec.checkable if w.checkable is None else w.checkable,
-            disabled=w.disabled,
+            disabled=w.disabled, layout=w.layout, flags=w.flags,
         )
-        props += widgets.widget_value_props(spec, w.value)
-        props += widgets.style_records(spec, spec.key, w.styles)
+        props += widgets.config_props(spec, w.config)
+        props += widgets.style_records(spec, w.styles)
         props += w.events
 
         node: Dict[str, Any] = {

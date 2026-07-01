@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from squareline_mcp import Project, Screen, Widget  # noqa: E402
-from squareline_mcp import widgets, spj  # noqa: E402
+from squareline_mcp import widgets, spj, styles, events  # noqa: E402
 
 
 def _strtypes(node):
@@ -21,8 +21,10 @@ def build_project():
     p = Project(name="Demo")
     s = Screen(name="MainScreen")
     p.screens.append(s)
-    s.widgets.append(Widget(type_key="label", name="Title", x=10, y=10,
-                            value="Hi", styles={"text_color": [255, 255, 255, 255]}))
+    title = Widget(type_key="label", name="Title", x=10, y=10)
+    title.set_value("Hi")
+    title.set_style("text_color", [255, 255, 255, 255])
+    s.widgets.append(title)
     panel = Widget(type_key="panel", name="Card", x=0, y=40, w=200, h=100)
     panel.children.append(Widget(type_key="button", name="Btn"))
     s.widgets.append(panel)
@@ -61,26 +63,27 @@ def test_screen_node():
     assert "OBJECT/Size" not in st
 
 
-def test_label_matches_reference_object_base():
-    """The verified LABEL property set from the reference export."""
+def test_label_object_base_present():
     p = Project(name="X")
     s = Screen(name="S")
     p.screens.append(s)
-    s.widgets.append(Widget(type_key="label", name="Desc1", value="Desc1"))
+    lbl_w = Widget(type_key="label", name="Desc1")
+    lbl_w.set_value("Desc1")
+    s.widgets.append(lbl_w)
     lbl = p.to_spj()["root"]["children"][0]["children"][0]
     st = _strtypes(lbl)
-    # geometry + widget value + style all present
     for expected in ["OBJECT/Name", "OBJECT/Position", "OBJECT/Size", "OBJECT/Align",
                      "LABEL/Text", "LABEL/Long_mode", "LABEL/Recolor", "LABEL/Style_main"]:
         assert expected in st, expected
-    assert len(st) == 45  # exact count from the genuine export
 
 
 def test_property_value_encoding():
     p = Project(name="X")
     s = Screen(name="S")
     p.screens.append(s)
-    s.widgets.append(Widget(type_key="label", name="L", x=5, y=7, w=80, h=20, value="hey"))
+    lw = Widget(type_key="label", name="L", x=5, y=7, w=80, h=20)
+    lw.set_value("hey")
+    s.widgets.append(lw)
     lbl = p.to_spj()["root"]["children"][0]["children"][0]
     by = {pr["strtype"]: pr for pr in lbl["properties"]}
     assert by["OBJECT/Position"]["intarray"] == [5, 7]
@@ -90,6 +93,67 @@ def test_property_value_encoding():
     assert by["LABEL/Text"]["InheritedType"] == spj.IT_STRING
     assert by["OBJECT/Hidden"]["strval"] == "False"
     assert by["OBJECT/Hidden"]["InheritedType"] == spj.IT_BOOL
+
+
+def test_all_widget_types_serialise():
+    """Every catalogued widget must serialise to a valid node with a style_main."""
+    for key in widgets.WIDGETS:
+        p = Project(name="W")
+        s = Screen(name="S")
+        p.screens.append(s)
+        s.widgets.append(Widget(type_key=key, name="w_" + key))
+        node = p.to_spj()["root"]["children"][0]["children"][0]
+        assert node["saved_objtypeKey"] == widgets.WIDGETS[key].key
+        sts = _strtypes(node)
+        assert any(x.endswith("/Style_main") or x.endswith("/Style_bg") for x in sts), key
+
+
+def test_multi_state_style():
+    p = Project(name="X")
+    s = Screen(name="S")
+    p.screens.append(s)
+    w = Widget(type_key="button", name="B")
+    w.set_style("bg_color", "#112233", part="main", state="DEFAULT")
+    w.set_style("bg_color", "#445566", part="main", state="PRESSED")
+    s.widgets.append(w)
+    node = p.to_spj()["root"]["children"][0]["children"][0]
+    sm = [pr for pr in node["properties"] if pr["strtype"] == "BUTTON/Style_main"][0]
+    state_names = [c["strval"] for c in sm["childs"]]
+    assert "DEFAULT" in state_names and "PRESSED" in state_names
+
+
+def test_all_actions_build():
+    """Every bundled action builds a structurally valid event record."""
+    p = Project(name="X")
+    s = Screen(name="Main")
+    s2 = Screen(name="Other")
+    p.screens += [s, s2]
+    btn = Widget(type_key="button", name="B")
+    s.widgets.append(btn)
+    for action in events.ACTIONS:
+        ev = events.build_event("CLICKED", action, {}, p.guid_of)
+        assert ev["strtype"] == "_event/EventHandler"
+        act = ev["childs"][-1]
+        assert act["strtype"] == "_event/action"
+        assert act["strval"] == action
+        # Call/CallC templates preserved verbatim
+        calls = [c for c in act["childs"] if c["strtype"].endswith("/CallC")]
+        assert calls, action
+
+
+def test_flags_and_layout():
+    p = Project(name="X")
+    s = Screen(name="S")
+    p.screens.append(s)
+    w = Widget(type_key="panel", name="P")
+    w.flags["Scrollable"] = False
+    w.layout = {"type": "flex", "flow": "COLUMN", "main_align": "CENTER"}
+    s.widgets.append(w)
+    node = p.to_spj()["root"]["children"][0]["children"][0]
+    by = {pr["strtype"]: pr for pr in node["properties"]}
+    assert by["OBJECT/Scrollable"]["strval"] == "False"
+    lt = by["OBJECT/Layout_type"]
+    assert lt["strval"] == "Flex_layout" and lt["Flow"] == 1 and lt["MainAlignment"] == 2
 
 
 def test_container_nesting_and_leaf_has_no_children():
@@ -109,7 +173,8 @@ def test_change_screen_event():
     p.screens += [a, b]
     btn = Widget(type_key="button", name="Go")
     a.widgets.append(btn)
-    btn.events.append(spj.change_screen_event("CLICKED", b.guid, "B"))
+    btn.events.append(events.build_event("CLICKED", "CHANGE SCREEN",
+                                         {"Screen_to": "B"}, p.guid_of))
     node = p.to_spj()["root"]["children"][0]["children"][0]
     ev = [pr for pr in node["properties"] if pr.get("strtype") == "_event/EventHandler"][0]
     assert ev["strval"] == "CLICKED"

@@ -18,6 +18,41 @@ from .board import CROWPANEL_5, Board
 PartStyles = Dict[str, Dict[str, Dict[str, Any]]]
 
 
+# --- raw property-list helpers (used when editing loaded nodes in place) ------
+
+def find_prop(props: List[Dict[str, Any]], strtype: str) -> Optional[Dict[str, Any]]:
+    for p in props:
+        if p.get("strtype") == strtype:
+            return p
+    return None
+
+
+def prop_value(props: List[Dict[str, Any]], strtype: str) -> Any:
+    p = find_prop(props, strtype)
+    if p is None:
+        return None
+    for k in ("strval", "integer", "intarray"):
+        if k in p:
+            return p[k]
+    return None
+
+
+def set_prop(props: List[Dict[str, Any]], strtype: str, it: int, value: Any) -> None:
+    """Update an existing property record in place, or append a new one."""
+    rec = spj.p_value(strtype, it, value)
+    existing = find_prop(props, strtype)
+    if existing is None:
+        props.append(rec)
+        return
+    # overwrite value keys on the existing record, keep its nid
+    for k in ("strval", "integer", "intarray"):
+        existing.pop(k, None)
+    for k in ("strval", "integer", "intarray"):
+        if k in rec:
+            existing[k] = rec[k]
+    existing["InheritedType"] = it
+
+
 @dataclass
 class Widget:
     type_key: str
@@ -38,18 +73,112 @@ class Widget:
     events: List[Dict[str, Any]] = field(default_factory=list)
     children: List["Widget"] = field(default_factory=list)
     guid: str = field(default_factory=spj.new_guid)
+    # Loaded widgets carry their original node; edits patch it in place so any
+    # property/widget type we don't model semantically survives round-trips.
+    node: Optional[Dict[str, Any]] = None
+    raw_key: Optional[str] = None      # objtypeKey when it's outside our catalogue
 
     @property
-    def spec(self) -> widgets.WidgetSpec:
-        return widgets.WIDGETS[self.type_key]
+    def spec(self) -> Optional[widgets.WidgetSpec]:
+        return widgets.WIDGETS.get(self.type_key)
+
+    @property
+    def objkey(self) -> str:
+        if self.raw_key:
+            return self.raw_key
+        sp = self.spec
+        return sp.key if sp else self.type_key
+
+    @property
+    def is_container(self) -> bool:
+        if self.node is not None:
+            return "children" in self.node
+        sp = self.spec
+        return bool(sp and sp.container)
+
+    @property
+    def value_field(self) -> Optional[str]:
+        sp = self.spec
+        return sp.value_field if sp else None
+
+    def _props(self) -> Optional[List[Dict[str, Any]]]:
+        return self.node["properties"] if self.node is not None else None
+
+    def rename(self, new: str) -> None:
+        self.name = new
+        if self._props() is not None:
+            set_prop(self._props(), "OBJECT/Name", spj.IT_STRING, new)
+
+    def set_geometry(self, x=None, y=None, w=None, h=None, align=None) -> None:
+        if x is not None:
+            self.x = x
+        if y is not None:
+            self.y = y
+        if w is not None:
+            self.w = w
+        if h is not None:
+            self.h = h
+        if align is not None:
+            self.align = align
+        props = self._props()
+        if props is not None:
+            set_prop(props, "OBJECT/Position", spj.IT_INTARRAY, [self.x, self.y])
+            set_prop(props, "OBJECT/Size", spj.IT_INTARRAY, [self.w, self.h])
+            if align is not None:
+                set_prop(props, "OBJECT/Align", spj.IT_ENUM, self.align)
+
+    def set_state_flag(self, suffix: str, value: bool) -> None:
+        setattr_map = {"Hidden": "hidden", "Clickable": "clickable",
+                       "Checkable": "checkable", "Disabled": "disabled"}
+        if suffix in setattr_map:
+            setattr(self, setattr_map[suffix], value)
+        props = self._props()
+        if props is not None:
+            set_prop(props, "OBJECT/%s" % suffix, spj.IT_BOOL, value)
+        else:
+            self.flags[suffix] = value
 
     def set_value(self, value: Any) -> None:
-        if self.spec.value_field is None:
-            raise ValueError("Widget type %r has no editable value" % self.spec.key)
-        self.config[self.spec.value_field] = value
+        vf = self.value_field
+        if vf is None:
+            raise ValueError("Widget type %r has no editable value" % self.objkey)
+        self.config[vf] = value
+        props = self._props()
+        if props is not None:
+            it = next((i for s, i, _ in self.spec.config if s == vf), spj.IT_STRING)
+            set_prop(props, "%s/%s" % (self.objkey, vf), it, value)
+
+    def set_object_flag(self, suffix: str, value: Any) -> None:
+        """Set any OBJECT/* flag or enum (bool or string), dual-mode."""
+        sync = {"Hidden": "hidden", "Clickable": "clickable",
+                "Checkable": "checkable", "Disabled": "disabled"}
+        if suffix in sync and isinstance(value, bool):
+            setattr(self, sync[suffix], value)
+        props = self._props()
+        if props is not None:
+            it = spj.IT_BOOL if isinstance(value, bool) else spj.IT_ENUM
+            set_prop(props, "OBJECT/%s" % suffix, it, value)
+        else:
+            self.flags[suffix] = value
+
+    def set_config(self, suffix: str, value: Any) -> None:
+        self.config[suffix] = value
+        props = self._props()
+        if props is not None:
+            cfg = self.spec.config if self.spec else []
+            it = next((i for s, i, _ in cfg if s == suffix), spj.IT_STRING)
+            set_prop(props, "%s/%s" % (self.objkey, suffix), it, value)
 
     def set_style(self, key: str, value: Any, part: str = "main", state: str = "DEFAULT") -> None:
         self.styles.setdefault(part, {}).setdefault(state, {})[key] = value
+        if self.node is not None:
+            _patch_style_on_node(self, key, value, part, state)
+
+    def add_event(self, record: Dict[str, Any]) -> None:
+        if self._props() is not None:
+            self._props().append(record)
+        else:
+            self.events.append(record)
 
 
 @dataclass
@@ -59,6 +188,12 @@ class Screen:
     styles: PartStyles = field(default_factory=dict)
     events: List[Dict[str, Any]] = field(default_factory=list)
     guid: str = field(default_factory=spj.new_guid)
+    node: Optional[Dict[str, Any]] = None
+
+    def rename(self, new: str) -> None:
+        self.name = new
+        if self.node is not None:
+            set_prop(self.node["properties"], "OBJECT/Name", spj.IT_STRING, new)
 
 
 @dataclass
@@ -67,6 +202,12 @@ class Project:
     board: Board = field(default_factory=lambda: CROWPANEL_5)
     screens: List[Screen] = field(default_factory=list)
     assets: assets.AssetManager = field(default_factory=assets.AssetManager)
+    # Preserved verbatim when a project is loaded, so round-trips are lossless.
+    raw_info: Optional[Dict[str, Any]] = None
+    root_guid: Optional[str] = None
+    root_props: Optional[List[Dict[str, Any]]] = None
+    animations: List[Dict[str, Any]] = field(default_factory=list)
+    selected_theme: str = ""
 
     # -- fonts / assets ------------------------------------------------------
 
@@ -84,10 +225,14 @@ class Project:
         def walk(ws: List[Widget]) -> None:
             for w in ws:
                 scan(w.styles)
+                if w.node is not None:
+                    scan_fonts_in_node(w.node, found)
                 walk(w.children)
 
         for s in self.screens:
             scan(s.styles)
+            if s.node is not None:
+                scan_fonts_in_node(s.node, found)
             walk(s.widgets)
         return found
 
@@ -133,26 +278,71 @@ class Project:
             _collect(s.widgets, names)
         return names
 
+    # -- structural edits ----------------------------------------------------
+
+    def _parent_list(self, name: str) -> Optional[List[Widget]]:
+        """The list (screen.widgets or container.children) that holds `name`."""
+        for s in self.screens:
+            lst = _owner_list(s.widgets, name)
+            if lst is not None:
+                return lst
+        return None
+
+    def pop_widget(self, name: str) -> Widget:
+        lst = self._parent_list(name)
+        if lst is None:
+            raise KeyError("No widget named %r" % name)
+        w = next(x for x in lst if x.name == name)
+        lst.remove(w)
+        return w
+
+    def move_widget(self, name: str, parent: str = "", screen: str = "",
+                    index: Optional[int] = None) -> None:
+        """Re-parent / reorder a widget. Give a container `parent`, or a `screen`."""
+        if parent:
+            container = self.find_widget(parent)
+            if not container.is_container:
+                raise ValueError("%r is not a container" % parent)
+            if container.name == name:
+                raise ValueError("A widget cannot be its own parent")
+            target = container.children
+        else:
+            target = self.screen(screen or self.screens[0].name).widgets
+        w = self.pop_widget(name)
+        if index is None or index < 0 or index > len(target):
+            target.append(w)
+        else:
+            target.insert(index, w)
+
     # -- serialisation -------------------------------------------------------
 
     def to_spj(self) -> Dict[str, Any]:
         return {
             "root": self._root_node(),
-            "animations": [],
-            "selected_theme": "",
-            "info": self.board.info(self.name),
+            "animations": self.animations,
+            "selected_theme": self.selected_theme,
+            "info": self._info(),
         }
 
     def dumps(self) -> str:
         return json.dumps(self.to_spj(), indent=1)
 
+    def _info(self) -> Dict[str, Any]:
+        if self.raw_info is not None:
+            info = dict(self.raw_info)
+            info["Name"] = self.name
+            info["name"] = "%s.spj" % self.name
+            info["width"], info["height"] = self.board.width, self.board.height
+            return info
+        return self.board.info(self.name)
+
     def _root_node(self) -> Dict[str, Any]:
         return {
-            "guid": spj.new_guid(),
+            "guid": self.root_guid or spj.new_guid(),
             "deepid": 0,
             "children": [self._screen_node(s) for s in self.screens],
             "locked": False,
-            "properties": [
+            "properties": self.root_props if self.root_props is not None else [
                 spj.p_string("STARTEVENTS/Name", "___initial_actions0"),
             ],
             "saved_objtypeKey": "STARTEVENTS",
@@ -166,6 +356,9 @@ class Project:
         return spj.p_style("SCREEN/%s" % suffix, styles.PARTS[part], summary, states)
 
     def _screen_node(self, s: Screen) -> Dict[str, Any]:
+        if s.node is not None:                       # loaded screen: reuse node
+            s.node["children"] = [self._widget_node(w) for w in s.widgets]
+            return s.node
         props = spj.object_base_props(name=s.name, is_screen=True)
         props += [
             spj.p_header("SCREEN/Screen"),
@@ -188,6 +381,10 @@ class Project:
         }
 
     def _widget_node(self, w: Widget) -> Dict[str, Any]:
+        if w.node is not None:                       # loaded widget: reuse node
+            if "children" in w.node:
+                w.node["children"] = [self._widget_node(c) for c in w.children]
+            return w.node
         spec = w.spec
         width = w.w or spec.default_w
         height = w.h or spec.default_h
@@ -214,11 +411,63 @@ class Project:
         return node
 
 
+def _patch_style_on_node(w: Widget, key: str, value: Any, part: str, state: str) -> None:
+    """Insert/replace a style record inside a loaded widget's raw node."""
+    props = w.node["properties"]
+    lvpart = styles.PARTS.get(part, "lv.PART.MAIN")
+    rec = next((p for p in props if p.get("InheritedType") == spj.IT_STYLE
+                and p.get("part") == lvpart), None)
+    if rec is None:
+        suffix = "Style_main" if part == "main" else "Style_%s" % part
+        rec = spj.p_style("%s/%s" % (w.objkey, suffix), lvpart, lvpart, {})
+        props.append(rec)
+    childs = rec.setdefault("childs", [])
+    st = next((c for c in childs if c.get("strtype") == "_style/StyleState"
+               and c.get("strval") == state), None)
+    if st is None:
+        st = {"nid": spj.new_nid(), "strtype": "_style/StyleState", "strval": state,
+              "childs": [], "InheritedType": spj.IT_HEADER}
+        childs.append(st)
+    child = styles.build_record(key, value)
+    stc = st.setdefault("childs", [])
+    for i, ex in enumerate(stc):
+        if ex.get("strtype") == child["strtype"]:
+            stc[i] = child
+            break
+    else:
+        stc.append(child)
+
+
+def scan_fonts_in_node(node: Dict[str, Any], out: List[str]) -> None:
+    """Collect _style/Text_Font values anywhere inside a raw node."""
+    if isinstance(node, dict):
+        if node.get("strtype") == "_style/Text_Font":
+            v = node.get("strval")
+            if v and v not in out:
+                out.append(v)
+        for v in node.values():
+            scan_fonts_in_node(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            scan_fonts_in_node(v, out)
+
+
 def _find(ws: List[Widget], name: str) -> Optional[Widget]:
     for w in ws:
         if w.name == name:
             return w
         hit = _find(w.children, name)
+        if hit is not None:
+            return hit
+    return None
+
+
+def _owner_list(ws: List[Widget], name: str) -> Optional[List[Widget]]:
+    """Return the list that directly contains a widget named `name`."""
+    for w in ws:
+        if w.name == name:
+            return ws
+        hit = _owner_list(w.children, name)
         if hit is not None:
             return hit
     return None

@@ -71,6 +71,26 @@ def create_project(name: str, preset: str = "crowpanel-5",
 
 
 @mcp.tool()
+def load_project(path: str) -> str:
+    """Load an existing .spj file for editing (replaces any current project).
+
+    Loaded screens/widgets keep their original data, so you can add/rename/
+    delete/restyle and export without losing anything — including widget types
+    this tool doesn't model. Then use export_project to save.
+    """
+    global _project
+    from . import loader
+    if not os.path.isfile(path):
+        raise ValueError("File not found: %s" % path)
+    _project = loader.load(path)
+    p = _project
+    n = len(p.all_names()) - len(p.screens)
+    return ("Loaded %r (%s, %dx%d, LVGL %s): %d screen(s), %d widget(s).\n%s"
+            % (p.name, p.board.board, p.board.width, p.board.height,
+               p.board.lvgl_version, len(p.screens), n, list_project()))
+
+
+@mcp.tool()
 def add_screen(name: str) -> str:
     """Add a screen. The first screen added is the app's start screen."""
     p = _require()
@@ -112,8 +132,8 @@ def add_widget(screen: str, type: str, name: str,
     s = p.screen(screen)
     if parent:
         container = p.find_widget(parent)
-        if not container.spec.container:
-            raise ValueError("Parent %r (%s) is not a container" % (parent, container.spec.key))
+        if not container.is_container:
+            raise ValueError("Parent %r (%s) is not a container" % (parent, container.objkey))
         container.children.append(w)
         where = "inside %r" % parent
     else:
@@ -136,26 +156,26 @@ def set_property(widget: str, x: int = -100000, y: int = -100000,
     p = _require()
     w = p.find_widget(widget)
     changed = []
+    geom = {}
     if x != -100000:
-        w.x = x; changed.append("x")
+        geom["x"] = x; changed.append("x")
     if y != -100000:
-        w.y = y; changed.append("y")
+        geom["y"] = y; changed.append("y")
     if width >= 0:
-        w.w = width; changed.append("width")
+        geom["w"] = width; changed.append("width")
     if height >= 0:
-        w.h = height; changed.append("height")
+        geom["h"] = height; changed.append("height")
+    if align:
+        geom["align"] = align; changed.append("align")
+    if geom:
+        w.set_geometry(**geom)
     if value != "":
         w.set_value(value); changed.append("value")
-    if align:
-        w.align = align; changed.append("align")
-    if hidden != "":
-        w.hidden = _as_bool(hidden); changed.append("hidden")
-    if clickable != "":
-        w.clickable = _as_bool(clickable); changed.append("clickable")
-    if checkable != "":
-        w.checkable = _as_bool(checkable); changed.append("checkable")
-    if disabled != "":
-        w.disabled = _as_bool(disabled); changed.append("disabled")
+    for flag_name, arg in (("Hidden", hidden), ("Clickable", clickable),
+                           ("Checkable", checkable), ("Disabled", disabled)):
+        if arg != "":
+            w.set_state_flag(flag_name, _as_bool(arg))
+            changed.append(flag_name.lower())
     return "Updated %r: %s" % (widget, ", ".join(changed) or "nothing")
 
 
@@ -169,11 +189,12 @@ def configure_widget(widget: str, property: str, value: str) -> str:
     """
     p = _require()
     w = p.find_widget(widget)
-    valid = {s for s, _, _ in w.spec.config}
-    if property not in valid:
-        raise ValueError("%s has no config %r. Valid: %s"
-                         % (w.spec.key, property, ", ".join(sorted(valid)) or "none"))
-    w.config[property] = _coerce(value)
+    if w.spec is not None:
+        valid = {s for s, _, _ in w.spec.config}
+        if property not in valid:
+            raise ValueError("%s has no config %r. Valid: %s"
+                             % (w.objkey, property, ", ".join(sorted(valid)) or "none"))
+    w.set_config(property, _coerce(value))
     return "Set %s.%s = %r" % (widget, property, w.config[property])
 
 
@@ -189,7 +210,7 @@ def set_flag(widget: str, flag: str, value: str = "true") -> str:
     p = _require()
     w = p.find_widget(widget)
     v: Any = _as_bool(value) if value.lower() in ("true", "false", "1", "0", "yes", "no") else value
-    w.flags[flag] = v
+    w.set_object_flag(flag, v)
     return "Set flag %s.%s = %r" % (widget, flag, v)
 
 
@@ -299,7 +320,7 @@ def add_event(widget: str, action: str, trigger: str = "CLICKED",
     def resolver(nm: str) -> str:
         return p.guid_of(nm)
 
-    w.events.append(events.build_event(trigger, name, params, resolver))
+    w.add_event(events.build_event(trigger, name, params, resolver))
     return "Added %s event on %r (%s)." % (name, widget, events.resolve_trigger(trigger))
 
 
@@ -314,7 +335,7 @@ def add_navigation(widget: str, target_screen: str, trigger: str = "CLICKED",
     w = p.find_widget(widget)
     p.screen(target_screen)  # validate exists
     params = {"Screen_to": target_screen, "Fade_mode": fade, "Speed": speed}
-    w.events.append(events.build_event(trigger, "CHANGE SCREEN", params, p.guid_of))
+    w.add_event(events.build_event(trigger, "CHANGE SCREEN", params, p.guid_of))
     return "%r changes to screen %r on %s." % (widget, target_screen, events.resolve_trigger(trigger))
 
 
@@ -358,15 +379,15 @@ def set_image(widget: str, source: str, slot: str = "") -> str:
     if slot == "bg":
         w.set_style("bg_image", ref)
         return "Set background image on %r -> %s" % (widget, ref)
-    if w.spec.key == "IMGBUTTON":
+    if w.objkey == "IMGBUTTON":
         suffix = _IMGBTN_SLOTS.get(slot or "released")
         if not suffix:
             raise ValueError("Unknown imagebutton slot %r. Valid: %s"
                              % (slot, ", ".join(_IMGBTN_SLOTS)))
-        w.config[suffix] = ref
+        w.set_config(suffix, ref)
         return "Set imagebutton %r %s -> %s" % (widget, suffix, ref)
-    if w.spec.value_field == "Asset" or "Asset" in {s for s, _, _ in w.spec.config}:
-        w.config["Asset"] = ref
+    if w.spec and (w.spec.value_field == "Asset" or "Asset" in {s for s, _, _ in w.spec.config}):
+        w.set_config("Asset", ref)
         return "Set image %r -> %s" % (widget, ref)
     # fallback: treat as background image
     w.set_style("bg_image", ref)
@@ -420,6 +441,63 @@ def get_lv_conf_requirements() -> str:
     return "\n".join(lines)
 
 
+# --- structural edits --------------------------------------------------------
+
+
+@mcp.tool()
+def rename_widget(widget: str, new_name: str) -> str:
+    """Rename a widget (updates its C identifier prefix on export)."""
+    p = _require()
+    if new_name in p.all_names():
+        raise ValueError("Name %r is already used" % new_name)
+    w = p.find_widget(widget)
+    w.rename(new_name)
+    return "Renamed %r -> %r" % (widget, new_name)
+
+
+@mcp.tool()
+def delete_widget(widget: str) -> str:
+    """Delete a widget (and its children) from the project."""
+    p = _require()
+    w = p.pop_widget(widget)
+    kids = len(w.children)
+    return "Deleted %s %r%s." % (w.objkey, widget,
+                                 " (and %d child widget(s))" % kids if kids else "")
+
+
+@mcp.tool()
+def move_widget(widget: str, parent: str = "", screen: str = "", index: int = -1) -> str:
+    """Move a widget under a different container (`parent`) or onto a `screen`.
+
+    index: position among siblings (-1 = append to the end).
+    """
+    p = _require()
+    p.move_widget(widget, parent=parent, screen=screen,
+                  index=None if index < 0 else index)
+    where = "under %r" % parent if parent else "onto screen %r" % (screen or p.screens[0].name)
+    return "Moved %r %s." % (widget, where)
+
+
+@mcp.tool()
+def rename_screen(screen: str, new_name: str) -> str:
+    """Rename a screen."""
+    p = _require()
+    if new_name in p.all_names():
+        raise ValueError("Name %r is already used" % new_name)
+    p.screen(screen).rename(new_name)
+    return "Renamed screen %r -> %r" % (screen, new_name)
+
+
+@mcp.tool()
+def delete_screen(screen: str) -> str:
+    """Delete a screen and everything on it."""
+    p = _require()
+    s = p.screen(screen)
+    p.screens.remove(s)
+    return "Deleted screen %r. Remaining: %s" % (
+        screen, ", ".join(x.name for x in p.screens) or "none")
+
+
 # --- inspection / export -----------------------------------------------------
 
 
@@ -440,12 +518,12 @@ def list_project() -> str:
 
 def _tree(ws: List[Widget], lines: List[str], indent: int) -> None:
     for w in ws:
-        val = w.config.get(w.spec.value_field) if w.spec.value_field else None
+        val = w.config.get(w.value_field) if w.value_field else None
         extra = "  =%r" % (str(val)[:24]) if val not in (None, "") else ""
-        ev = "  [%d event(s)]" % len(w.events) if w.events else ""
-        lines.append("%s%s %s @(%d,%d) %dx%d%s%s"
-                     % (" " * indent, w.spec.key, w.name, w.x, w.y,
-                        w.w or w.spec.default_w, w.h or w.spec.default_h, extra, ev))
+        dw = w.w or (w.spec.default_w if w.spec else 0)
+        dh = w.h or (w.spec.default_h if w.spec else 0)
+        lines.append("%s%s %s @(%d,%d) %dx%d%s"
+                     % (" " * indent, w.objkey, w.name, w.x, w.y, dw, dh, extra))
         _tree(w.children, lines, indent + 2)
 
 

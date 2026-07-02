@@ -2,9 +2,15 @@
 
 from .board import CROWPANEL_5, PRESETS, Board
 from .project import Project, Screen, Widget
-from . import assets, events, styles, widgets
+from . import assets, events, loader, styles, widgets
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
+
+
+def load(path):
+    """Load an existing .spj file into a Project (convenience re-export)."""
+    return loader.load(path)
+
 
 __all__ = ["Project", "Screen", "Widget", "Board", "CROWPANEL_5", "PRESETS",
-           "assets", "events", "styles", "widgets"]
+           "assets", "events", "loader", "styles", "widgets", "load"]

@@ -10,7 +10,25 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from squareline_mcp import Project, Screen, Widget  # noqa: E402
-from squareline_mcp import widgets, spj, styles, events  # noqa: E402
+from squareline_mcp import widgets, spj, styles, events, loader  # noqa: E402
+
+
+def _node_tree(d):
+    """(objtype, name) list, depth-first, from a serialised .spj dict."""
+    out = []
+
+    def w(n):
+        if isinstance(n, dict):
+            k = n.get("saved_objtypeKey")
+            if k and k != "STARTEVENTS":
+                nm = next((p.get("strval") for p in n.get("properties", [])
+                           if p.get("strtype") == "OBJECT/Name"), None)
+                out.append((k, nm))
+            for c in n.get("children", []):
+                w(c)
+    for c in d["root"]["children"]:
+        w(c)
+    return out
 
 
 def _strtypes(node):
@@ -242,6 +260,92 @@ def test_image_export_copies_file(tmp_path=None):
     notes = p.assets.export_assets(d)
     assert os.path.isfile(os.path.join(d, "assets", "pic.png"))
     assert any("copied" in n for n in notes)
+
+
+def _rich_project():
+    p = Project(name="Rich")
+    a = Screen(name="Home")
+    b = Screen(name="Setup")
+    p.screens += [a, b]
+    card = Widget(type_key="panel", name="Card", x=10, y=10, w=200, h=120)
+    lbl = Widget(type_key="label", name="Lbl", x=5, y=5)
+    lbl.set_value("Hi")
+    lbl.set_style("text_color", "#FFEE00")
+    card.children.append(lbl)
+    a.widgets.append(card)
+    b.widgets.append(Widget(type_key="slider", name="Sld", x=10, y=10))
+    return p
+
+
+def test_loader_roundtrip_structure_stable():
+    p = _rich_project()
+    dumped = p.to_spj()
+    reloaded = loader.from_dict(json.loads(json.dumps(dumped)))
+    again = reloaded.to_spj()
+    assert _node_tree(dumped) == _node_tree(again)
+
+
+def test_loader_preserves_unknown_widget_and_props():
+    """A widget type outside our catalogue must survive load -> save intact."""
+    weird = {
+        "guid": "GUID1-2S3", "deepid": 7, "locked": False,
+        "saved_objtypeKey": "WEIRDWIDGET",
+        "properties": [
+            spj.p_string("OBJECT/Name", "Weirdo"),
+            spj.p_intarray("OBJECT/Position", [3, 4]),
+            spj.p_intarray("OBJECT/Size", [50, 60]),
+            spj.p_string("WEIRDWIDGET/SecretSauce", "keepme"),
+        ],
+    }
+    screen = {
+        "guid": "GUIDs", "deepid": 1, "isPage": True, "locked": False,
+        "saved_objtypeKey": "SCREEN", "children": [weird],
+        "properties": [spj.p_string("OBJECT/Name", "S1")],
+    }
+    doc = {"root": {"guid": "r", "deepid": 0, "saved_objtypeKey": "STARTEVENTS",
+                    "properties": [], "children": [screen]},
+           "animations": [], "selected_theme": "", "info": {"Name": "P", "width": 800, "height": 480}}
+    proj = loader.from_dict(doc)
+    w = proj.find_widget("Weirdo")
+    assert w.objkey == "WEIRDWIDGET" and w.spec is None
+    # rename + move works even on an unknown widget
+    w.rename("Weirdo2")
+    out = proj.to_spj()
+    node = out["root"]["children"][0]["children"][0]
+    by = {p["strtype"]: p for p in node["properties"]}
+    assert node["saved_objtypeKey"] == "WEIRDWIDGET"
+    assert by["OBJECT/Name"]["strval"] == "Weirdo2"        # edit applied
+    assert by["WEIRDWIDGET/SecretSauce"]["strval"] == "keepme"  # unknown prop kept
+
+
+def test_edit_loaded_widget_patches_node():
+    src = loader.from_dict(json.loads(json.dumps(_rich_project().to_spj())))
+    lbl = src.find_widget("Lbl")
+    assert lbl.node is not None
+    lbl.set_geometry(x=99, y=88, w=44, h=22, align="CENTER")
+    lbl.set_value("changed")
+    lbl.set_style("text_color", "#010203")
+    lbl.set_state_flag("Hidden", True)
+    reloaded = loader.from_dict(json.loads(json.dumps(src.to_spj())))
+    w = reloaded.find_widget("Lbl")
+    by = {p["strtype"]: p for p in w.node["properties"]}
+    assert by["OBJECT/Position"]["intarray"] == [99, 88]
+    assert by["OBJECT/Size"]["intarray"] == [44, 22]
+    assert by["LABEL/Text"]["strval"] == "changed"
+    assert by["OBJECT/Hidden"]["strval"] == "True"
+
+
+def test_delete_and_move_on_loaded():
+    src = loader.from_dict(json.loads(json.dumps(_rich_project().to_spj())))
+    # move the slider from Setup screen into the Card panel on Home
+    src.move_widget("Sld", parent="Card")
+    card = src.find_widget("Card")
+    assert any(c.name == "Sld" for c in card.children)
+    assert not src.screen("Setup").widgets
+    # delete the label
+    src.pop_widget("Lbl")
+    names = src.all_names()
+    assert "Lbl" not in names and "Sld" in names
 
 
 if __name__ == "__main__":

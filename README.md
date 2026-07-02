@@ -58,7 +58,10 @@ See [`examples/mcp-config.json`](examples/mcp-config.json).
 | Tool | What it does |
 |------|--------------|
 | `create_project(name, preset, width, height)` | Start a project. Presets: `crowpanel-5` (default), `crowpanel-7`, `crowpanel-4.3`, `crowpanel-2.8`. |
+| `load_project(path)` | **Open an existing `.spj` for editing** (lossless — see below). |
 | `add_screen(name)` | Add a screen (first one is the start screen). |
+| `rename_widget` / `delete_widget` / `move_widget` | Rename, remove, or re-parent/reorder a widget. |
+| `rename_screen(screen, new_name)` / `delete_screen(screen)` | Manage screens. |
 | `add_widget(screen, type, name, x, y, width, height, value, parent, align)` | Add a widget, optionally nested in a container. |
 | `set_property(widget, x, y, width, height, value, align, hidden, clickable, checkable, disabled)` | Update geometry / value / core flags. |
 | `configure_widget(widget, property, value)` | Set any widget-specific config (e.g. `Range=[0,255]`, `Mode`, `Options`). |
@@ -117,6 +120,26 @@ any part (`main`, `indicator`, `knob`, `selected`, `scrollbar`, `items`,
 `cursor`, `ticks`, `placeholder`) and any state (`DEFAULT`, `PRESSED`,
 `CHECKED`, `DISABLED`, `FOCUSED`, combinable with `|`).
 
+### Editing existing projects (round-trip)
+
+`load_project(path)` reads an existing `.spj` back into the model so you can
+**create *and* edit**. It's lossless: loaded screens/widgets keep their original
+node and edits patch it in place, so anything this tool doesn't model —
+including widget types outside the catalogue (e.g. `ELOANIMATION`,
+`PROPERTYANIMATION`) and any exotic property — is written back **untouched**.
+Verified on real exports: loading and re-saving `ref.spj` (34 nodes),
+`actions.spj` (13), and a 1.3 MB 133-node project reproduces the widget tree
+identically. Typical flow:
+
+```
+load_project("~/SquareLine/Projects/Thermostat/Thermostat.spj")
+add_screen("Settings")
+rename_widget("Label1", "TempReadout")
+set_style("TempReadout", text_font="montserrat_28", part="main", state="PRESSED")
+move_widget("BackButton", parent="HeaderPanel")
+export_project("~/SquareLine/Projects/Thermostat/Thermostat.spj")   # save back
+```
+
 ## Example prompt
 
 > Create a CrowPanel project called "Thermostat". Add a HomeScreen with a title
@@ -134,8 +157,9 @@ python tests/test_spj.py             # run the schema tests
 
 ```
 src/squareline_mcp/
-  server.py         MCP server + 22 tools (FastMCP)
-  project.py        in-memory UI model + .spj assembler
+  server.py         MCP server + 28 tools (FastMCP)
+  project.py        in-memory UI model + .spj assembler (+ raw-node editing)
+  loader.py         parse an existing .spj back into the model (round-trip)
   spj.py            .spj property serialization (reverse-engineered schema)
   widgets.py        widget catalogue (config props + style parts)
   styles.py         full style-property catalogue, parts, states

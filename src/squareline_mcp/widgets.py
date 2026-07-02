@@ -260,6 +260,8 @@ def config_props(spec: WidgetSpec, overrides: Dict[str, Any]) -> List[Dict[str, 
         value = overrides.get(suffix, default)
         if it == spj.IT_INT and isinstance(value, str) and value != "":
             value = int(value)
+        if it == spj.IT_IMAGE and value in ("", None):
+            value = "-"          # SquareLine's "no image" sentinel
         recs.append(spj.p_value("%s/%s" % (spec.key, suffix), it, value))
     return recs
 

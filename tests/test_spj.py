@@ -194,6 +194,56 @@ def test_roundtrip_json():
     assert json.loads(json.dumps(d)) == d
 
 
+def test_empty_image_is_dash_sentinel():
+    p = Project(name="X")
+    s = Screen(name="S")
+    p.screens.append(s)
+    s.widgets.append(Widget(type_key="image", name="Img"))   # no source
+    node = p.to_spj()["root"]["children"][0]["children"][0]
+    asset = [pr for pr in node["properties"] if pr["strtype"] == "IMAGE/Asset"][0]
+    assert asset["strval"] == "-"
+
+
+def test_font_requirements_and_custom():
+    p = Project(name="X")
+    s = Screen(name="S")
+    p.screens.append(s)
+    a = Widget(type_key="label", name="A")
+    a.set_style("text_font", "montserrat_28")
+    b = Widget(type_key="label", name="B")
+    b.set_style("text_font", "MyCustomFont")
+    s.widgets += [a, b]
+    assert "montserrat_28" in p.used_fonts()
+    assert "#define LV_FONT_MONTSERRAT_28 1" in p.font_requirements()
+    assert p.custom_fonts() == ["MyCustomFont"]
+
+
+def test_image_asset_register_and_ref():
+    p = Project(name="X")
+    ref = p.assets.resolve_image("/some/dir/logo.png")
+    assert ref == "assets/logo.png"
+    # already-registered ref passes through; '-'/'' -> none sentinel
+    assert p.assets.resolve_image(ref) == "assets/logo.png"
+    assert p.assets.resolve_image("") == "-"
+    assert p.assets.resolve_image("-") == "-"
+
+
+def test_image_export_copies_file(tmp_path=None):
+    import tempfile
+    p = Project(name="X")
+    s = Screen(name="S")
+    p.screens.append(s)
+    d = tempfile.mkdtemp()
+    src = os.path.join(d, "pic.png")
+    with open(src, "wb") as fh:
+        fh.write(b"\x89PNG\r\n\x1a\n")  # tiny fake png
+    ref = p.assets.resolve_image(src)
+    assert ref == "assets/pic.png"
+    notes = p.assets.export_assets(d)
+    assert os.path.isfile(os.path.join(d, "assets", "pic.png"))
+    assert any("copied" in n for n in notes)
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

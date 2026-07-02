@@ -67,9 +67,26 @@ See [`examples/mcp-config.json`](examples/mcp-config.json).
 | `set_layout(widget, type, flow, wrap, *_align)` | Give a container a Flex or Grid layout. |
 | `add_event(widget, action, trigger, target, value, params_json)` | Attach **any** event action (see below). |
 | `add_navigation(widget, target_screen, trigger, fade, speed)` | Convenience *Change Screen* event. |
-| `list_project()` / `list_widget_types()` / `list_actions()` / `list_styles()` | Introspection. |
-| `export_project(path)` | Write `<Name>.spj`. |
-| `get_board_info()` / `get_setup_guide()` | Reference helpers. |
+| `add_image(source, name)` / `set_image(widget, source, slot)` | Register/apply image assets (copied to `assets/` on export). |
+| `list_project()` / `list_widget_types()` / `list_actions()` / `list_styles()` / `list_fonts()` / `list_assets()` | Introspection. |
+| `export_project(path)` | Write `<Name>.spj` and copy image assets into `assets/`. |
+| `get_lv_conf_requirements()` / `get_board_info()` / `get_setup_guide()` | Reference helpers. |
+
+### Fonts & images
+
+SquareLine keeps no asset list inside the `.spj` — fonts are referenced by name
+and images by relative `assets/<file>` path. So:
+
+- **Fonts** — set `text_font` to a built-in `montserrat_8`…`montserrat_48`.
+  `list_fonts()` shows them; `get_lv_conf_requirements()` prints the
+  `#define LV_FONT_MONTSERRAT_NN 1` lines you need in `lv_conf.h`. Custom fonts
+  can be *referenced* but must be added once in SquareLine's Font Manager (their
+  definition isn't stored in the `.spj`).
+- **Images** — `add_image(path)` / `set_image(widget, path, slot)` register a
+  file; on `export_project` it's **copied into the project's `assets/` folder**
+  and stored as `assets/<file>` (SquareLine's convention; `-` means none).
+  Works for the image widget, imagebutton slots (released/pressed/…), and
+  `slot='bg'` backgrounds.
 
 ### Supported widgets (27)
 
@@ -117,12 +134,13 @@ python tests/test_spj.py             # run the schema tests
 
 ```
 src/squareline_mcp/
-  server.py         MCP server + 17 tools (FastMCP)
+  server.py         MCP server + 22 tools (FastMCP)
   project.py        in-memory UI model + .spj assembler
   spj.py            .spj property serialization (reverse-engineered schema)
   widgets.py        widget catalogue (config props + style parts)
   styles.py         full style-property catalogue, parts, states
   events.py         event/action builder (loads data/actions.json)
+  assets.py         fonts (+lv_conf) and image-asset management
   board.py          CrowPanel presets + the project `info` block
   guide.py          the CrowPanel/SquareLine/Arduino setup guide
   data/actions.json verbatim action templates from real exports

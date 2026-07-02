@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from . import events, styles, widgets
+from . import assets, events, styles, widgets
 from .board import CROWPANEL_5, PRESETS
 from .guide import SETUP_GUIDE
 from .project import Project, Screen, Widget
@@ -102,8 +102,13 @@ def add_widget(screen: str, type: str, name: str,
         raise ValueError("Name %r is already used; names must be unique" % name)
     w = Widget(type_key=key, name=name, x=x, y=y, w=width, h=height, align=align)
     if value != "" and w.spec.value_field:
-        int_field = any(s == w.spec.value_field and it == 6 for s, it, _ in w.spec.config)
-        w.set_value(_coerce(value) if int_field else value)
+        field_it = next((it for s, it, _ in w.spec.config if s == w.spec.value_field), None)
+        if field_it == 6:            # integer value (slider/bar/arc/spinbox)
+            w.set_value(_coerce(value))
+        elif field_it == 5:          # image asset (image widget) -> register + ref
+            w.set_value(p.assets.resolve_image(value))
+        else:
+            w.set_value(value)
     s = p.screen(screen)
     if parent:
         container = p.find_widget(parent)
@@ -251,6 +256,8 @@ def set_style(widget: str, part: str = "main", state: str = "DEFAULT",
         for k, v in json.loads(props_json).items():
             if k not in styles.STYLE_CATALOG:
                 raise ValueError("Unknown style %r; see list_styles()" % k)
+            if k == "bg_image":
+                v = p.assets.resolve_image(str(v))   # register/copy image on export
             put(k, v)
     if not applied:
         return "No styles given for %r." % widget
@@ -311,6 +318,108 @@ def add_navigation(widget: str, target_screen: str, trigger: str = "CLICKED",
     return "%r changes to screen %r on %s." % (widget, target_screen, events.resolve_trigger(trigger))
 
 
+# --- fonts & image assets ----------------------------------------------------
+
+# imagebutton image slots -> config suffix
+_IMGBTN_SLOTS = {
+    "released": "Image_released", "pressed": "Image_pressed",
+    "disabled": "Image_disabled", "checked_released": "Image_checked_released",
+    "checked_pressed": "Image_checked_pressed", "checked_disabled": "Image_checked_disabled",
+}
+
+
+@mcp.tool()
+def add_image(source: str, name: str = "") -> str:
+    """Register an image asset. On export the file is copied into the project's
+    assets/ folder and referenced as assets/<file>.
+
+    source: path to a PNG/JPG/BMP on disk (where the MCP server runs).
+    name:   optional logical name (defaults to the file's stem).
+    """
+    p = _require()
+    asset = p.assets.register_image(source, name)
+    exists = "" if os.path.isfile(source) else "  (WARNING: source not found yet)"
+    return "Registered image %r -> %s%s" % (asset.name, asset.ref, exists)
+
+
+@mcp.tool()
+def set_image(widget: str, source: str, slot: str = "") -> str:
+    """Set an image on a widget (auto-registers the source if it's a path).
+
+    - image widget: sets its picture.
+    - imagebutton: slot = released | pressed | disabled | checked_released |
+      checked_pressed | checked_disabled (default released).
+    - any widget with slot='bg': sets the background image style (MAIN/DEFAULT).
+    source: a path, an already-registered 'assets/x.png' ref, or '-' for none.
+    """
+    p = _require()
+    w = p.find_widget(widget)
+    ref = p.assets.resolve_image(source)
+    if slot == "bg":
+        w.set_style("bg_image", ref)
+        return "Set background image on %r -> %s" % (widget, ref)
+    if w.spec.key == "IMGBUTTON":
+        suffix = _IMGBTN_SLOTS.get(slot or "released")
+        if not suffix:
+            raise ValueError("Unknown imagebutton slot %r. Valid: %s"
+                             % (slot, ", ".join(_IMGBTN_SLOTS)))
+        w.config[suffix] = ref
+        return "Set imagebutton %r %s -> %s" % (widget, suffix, ref)
+    if w.spec.value_field == "Asset" or "Asset" in {s for s, _, _ in w.spec.config}:
+        w.config["Asset"] = ref
+        return "Set image %r -> %s" % (widget, ref)
+    # fallback: treat as background image
+    w.set_style("bg_image", ref)
+    return "Set background image on %r -> %s" % (widget, ref)
+
+
+@mcp.tool()
+def list_fonts() -> str:
+    """List the built-in Montserrat fonts and any custom fonts in use."""
+    p = _require()
+    lines = ["Built-in fonts (use as text_font): " + ", ".join(assets.BUILTIN_FONTS)]
+    used = p.used_fonts()
+    if used:
+        lines.append("In use: " + ", ".join(used))
+    custom = p.custom_fonts()
+    if custom:
+        lines.append("Custom (NOT stored in .spj — add each in SquareLine's Font "
+                     "Manager: Assets > Font > +): " + ", ".join(custom))
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def list_assets() -> str:
+    """List registered image assets and font requirements."""
+    p = _require()
+    lines = ["Images (%d):" % len(p.assets.images)]
+    for ref, a in p.assets.images.items():
+        ok = "ok" if os.path.isfile(a.source) else "source missing"
+        lines.append("  %s  <- %s  [%s]" % (ref, a.source, ok))
+    if not p.assets.images:
+        lines.append("  (none — use add_image / set_image)")
+    reqs = p.font_requirements()
+    if reqs:
+        lines.append("lv_conf.h font defines needed:")
+        lines += ["  " + r for r in reqs]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def get_lv_conf_requirements() -> str:
+    """Show the lv_conf.h settings the current project needs to compile/render."""
+    p = _require()
+    lines = ["// lv_conf.h settings for %r on %s" % (p.name, p.board.name),
+             "#define LV_COLOR_DEPTH %d" % p.board.color_depth,
+             "#define LV_TICK_CUSTOM 1"]
+    reqs = p.font_requirements()
+    lines += reqs if reqs else ["// (only default font used)"]
+    custom = p.custom_fonts()
+    if custom:
+        lines.append("// Custom fonts to add in SquareLine Font Manager: " + ", ".join(custom))
+    return "\n".join(lines)
+
+
 # --- inspection / export -----------------------------------------------------
 
 
@@ -350,13 +459,23 @@ def export_project(path: str = "") -> str:
     if os.path.isdir(target) or not target.lower().endswith(".spj"):
         target = os.path.join(target, "%s.spj" % p.name)
     target = os.path.abspath(target)
-    os.makedirs(os.path.dirname(target), exist_ok=True)
+    project_dir = os.path.dirname(target)
+    os.makedirs(project_dir, exist_ok=True)
     with open(target, "w", encoding="utf-8") as fh:
         fh.write(p.dumps())
     n = len(p.all_names()) - len(p.screens)
-    return ("Exported %r -> %s (%d screen(s), %d widget(s)). "
-            "Open in SquareLine via File > Open Project."
-            % (p.name, target, len(p.screens), n))
+    out = ["Exported %r -> %s (%d screen(s), %d widget(s))."
+           % (p.name, target, len(p.screens), n)]
+    for note in p.assets.export_assets(project_dir):
+        out.append("  asset: " + note)
+    reqs = p.font_requirements()
+    if reqs:
+        out.append("lv_conf.h needs: " + "; ".join(r.replace("#define ", "") for r in reqs))
+    custom = p.custom_fonts()
+    if custom:
+        out.append("Add custom fonts in SquareLine Font Manager: " + ", ".join(custom))
+    out.append("Open in SquareLine via File > Open Project.")
+    return "\n".join(out)
 
 
 @mcp.tool()

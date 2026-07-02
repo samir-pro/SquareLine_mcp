@@ -11,7 +11,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from . import spj, styles, widgets
+from . import assets, spj, styles, widgets
 from .board import CROWPANEL_5, Board
 
 # part -> state -> {friendly_style_key: value}
@@ -66,6 +66,43 @@ class Project:
     name: str
     board: Board = field(default_factory=lambda: CROWPANEL_5)
     screens: List[Screen] = field(default_factory=list)
+    assets: assets.AssetManager = field(default_factory=assets.AssetManager)
+
+    # -- fonts / assets ------------------------------------------------------
+
+    def used_fonts(self) -> List[str]:
+        """Every distinct text_font referenced anywhere in the project."""
+        found: List[str] = []
+
+        def scan(ps: PartStyles) -> None:
+            for by_state in ps.values():
+                for kv in by_state.values():
+                    f = kv.get("text_font")
+                    if f and f not in found:
+                        found.append(f)
+
+        def walk(ws: List[Widget]) -> None:
+            for w in ws:
+                scan(w.styles)
+                walk(w.children)
+
+        for s in self.screens:
+            scan(s.styles)
+            walk(s.widgets)
+        return found
+
+    def font_requirements(self) -> List[str]:
+        """lv_conf.h defines needed for the built-in fonts in use."""
+        reqs = []
+        for f in self.used_fonts():
+            sym = assets.font_lv_conf_symbol(f)
+            if sym:
+                reqs.append("#define %s 1" % sym)
+        return reqs
+
+    def custom_fonts(self) -> List[str]:
+        """Referenced fonts that are NOT built-in (must be added in SquareLine)."""
+        return [f for f in self.used_fonts() if not assets.is_builtin_font(f)]
 
     # -- lookups -------------------------------------------------------------
 
